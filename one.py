@@ -452,5 +452,5 @@ def mail_storage_job(hospital, deferred):
     sched.start()
 
 if __name__ == '__main__':
-    gmail_api(hospital_data['noble'], "noble", '', '178071eff982c505')
+    graph_api(hospital_data['noble'], "noble", '', '178071eff982c505')
     pass
