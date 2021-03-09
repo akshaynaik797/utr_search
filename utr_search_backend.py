@@ -492,17 +492,27 @@ def mail_storage_job(hospital, deferred):
     sched.start()
 
 def main():
-    hos_settlement_group = {}
+    hos_settlement_group, utrs = {}, {}
     q = "select hosp_name, hosp_group from hos_settlement_group where active=1"
     with mysql.connector.connect(**conn_data) as con:
         cur = con.cursor()
         cur.execute(q)
         result = cur.fetchall()
-        temp = set()
         for hosp_name, hosp_group in result:
             hos_settlement_group[hosp_group] = []
+            utrs[hosp_group] = set()
         for hosp_name, hosp_group in result:
             hos_settlement_group[hosp_group].append(hosp_name)
+        q = "select utr, hosp_group from settlement_utrs where search_completed=''"
+        cur.execute(q)
+        result = cur.fetchall()
+        for utr, hosp_group in result:
+            utrs[hosp_group].add(utr)
+        pass
+
+
+
+
 
 if __name__ == '__main__':
     main()
