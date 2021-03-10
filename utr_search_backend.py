@@ -3,8 +3,7 @@ import email
 import imaplib
 import os.path
 import pickle
-import signal
-import time
+import re
 from pathlib import Path
 from datetime import datetime, timedelta
 import json
@@ -180,8 +179,6 @@ def gmail_api(data, hosp, deferred, text):
                                     date = date.astimezone(timezone('Asia/Kolkata')).replace(tzinfo=None)
                                     format1 = '%d/%m/%Y %H:%M:%S'
                                     date = date.strftime(format1)
-                            if if_exists(id=id, subject=subject, date=date, hosp=hosp):
-                                continue
                             mail_attach_filepath = ''
                             try:
                                 flag = 0
@@ -256,8 +253,10 @@ def gmail_api(data, hosp, deferred, text):
                                 log_exceptions(id=id, hosp=hosp, folder=folder)
                             with mysql.connector.connect(**conn_data) as con:
                                 cur = con.cursor()
-                                q = f"insert into {hosp}_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`, `sender`, `folder`, `process`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
-                                data = (id, subject, date, str(datetime.now()), mail_attach_filepath, '', sender, folder, 'main')
+                                q = f"insert into utr_mails_temp (`id`,`subject`,`date`,`sys_time`,`attach_path`, `sender`, `hospital`, `utr`, `folder`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                                data = (
+                                    id, subject, date, str(datetime.now()), mail_attach_filepath,
+                                    sender, hosp, text, folder)
                                 cur.execute(q, data)
                                 con.commit()
                         except:
@@ -307,8 +306,6 @@ def graph_api(data, hosp, deferred, text):
                                     tzinfo=None)
                                 b = b.strftime('%d/%m/%Y %H:%M:%S')
                                 date, subject, sender = b, i['subject'], i['sender']['emailAddress']['address']
-                                if if_exists(hosp=hosp, subject=subject, date=date, id=i['id']):
-                                    continue
                                 mail_attach_filepath = ''
                                 flag = 0
                                 try:
@@ -350,10 +347,10 @@ def graph_api(data, hosp, deferred, text):
                                     log_exceptions(mid=i['id'], hosp=hosp, folder=folder)
                                 with mysql.connector.connect(**conn_data) as con:
                                     cur = con.cursor()
-                                    q = f"insert into {hosp}_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`, `sender`, `folder`, `process`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                                    q = f"insert into utr_mails_temp (`id`,`subject`,`date`,`sys_time`,`attach_path`, `sender`, `hospital`, `utr`, `folder`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
                                     data = (
-                                    i['id'], subject, date, str(datetime.now()), mail_attach_filepath, '', sender, folder,
-                                    'main')
+                                    i['id'], subject, date, str(datetime.now()), mail_attach_filepath,
+                                    sender, hosp, text, folder)
                                     cur.execute(q, data)
                                     con.commit()
                             except:
@@ -405,8 +402,6 @@ def imap_(data, hosp, deferred, text):
                     for i in ['\r', '\n', '\t']:
                         subject = subject.replace(i, '').strip()
                     mid = int(message_number)
-                    if if_exists(id=mid, date=date, subject=subject, hosp=hosp):
-                        continue
                     mail_attach_filepath = ""
                     try:
                         a = save_attachment(message, attachfile_path, email=sender)
@@ -426,10 +421,10 @@ def imap_(data, hosp, deferred, text):
                         log_exceptions(subject=subject, date=date, hosp=hosp, folder=folder)
                     with mysql.connector.connect(**conn_data) as con:
                         cur = con.cursor()
-                        q = f"insert into {hosp}_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`, `sender`, `folder`, `process`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                        q = f"insert into utr_mails_temp (`id`,`subject`,`date`,`sys_time`,`attach_path`, `sender`, `hospital`, `utr`, `folder`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
                         data = (
-                            mid, subject, date, str(datetime.now()), mail_attach_filepath, '', sender, folder,
-                            'main')
+                            mid, subject, date, str(datetime.now()), mail_attach_filepath,
+                            sender, hosp, text, folder)
                         cur.execute(q, data)
                         con.commit()
                 except:
@@ -465,17 +460,14 @@ def mail_mover(hospital, deferred):
             cur.execute(q, (i['sno'],))
             con.commit()
 
-def mail_storage(hospital, deferred):
-    for hosp, data in hospital_data.items():
-        if data['mode'] == 'gmail_api' and hosp == hospital:
-            print(hosp)
-            gmail_api(data, hosp, deferred)
-        elif data['mode'] == 'graph_api' and hosp == hospital:
-            print(hosp) #.astimezone(pytz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-            graph_api(data, hosp, deferred)
-        elif data['mode'] == 'imap_' and hosp == hospital:
-            print(hosp)
-            imap_(data, hosp, deferred)
+def search(text, hospital, deferred):
+    data, hosp = hospital_data[hospital], hospital
+    if data['mode'] == 'gmail_api':
+        gmail_api(data, hosp, deferred, text)
+    elif data['mode'] == 'graph_api':
+        graph_api(data, hosp, deferred, text)
+    elif data['mode'] == 'imap_':
+        imap_(data, hosp, deferred, text)
 
 def mail_storage_job(hospital, deferred):
     sched = BackgroundScheduler(daemon=False)
@@ -491,8 +483,56 @@ def mail_storage_job(hospital, deferred):
                           args=[data, hosp, deferred])
     sched.start()
 
+def process_utr_mails(utr):
+    utr_orig = utr
+    utr_temp = []
+    regex = re.compile(r'^[A-Za-z]+')
+    temp = regex.search(utr)
+    if temp is not None:
+        utr = regex.sub('', utr)
+    utr_temp_fields = ("sno","hospital","utr","id","subject","date","sys_time","attach_path","sender","folder","completed")
+    q = "select * from utr_mails_temp where utr like %s and completed='0'"
+    with mysql.connector.connect(**conn_data) as con:
+        cur = con.cursor()
+        cur.execute(q, ('%' + utr + '%',))
+        result = cur.fetchall()
+        for row in result:
+            temp = {}
+            for k, v in zip(utr_temp_fields, row):
+                temp[k] = v
+            utr_temp.append(temp)
+        for i in utr_temp:
+            data = (i['id'], i['subject'], i['date'])
+            q = "select sno from settlement_mails where id=%s and subject=%s and date=%s limit 1"
+            cur.execute(q, data)
+            result = cur.fetchone()
+            if result is not None:
+                q = "insert into utr_mails (`hospital`,`utr`,`utr2`,`completed`,`sett_table_sno`,`id`,`subject`,`date`,`sys_time`,`attach_path`,`sender`,`folder`) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                data = (i['hospital'], utr_orig, i['utr'], '', result[0], i['id'], i['subject'], i['date'], str(datetime.now()), i['attach_path'], i['sender'], i['folder'])
+                cur.execute(q, data)
+                con.commit()
+            else:
+                q = "insert into settlement_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`hospital`,`folder`,`process`) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                data = (i['id'], i['subject'], i['date'], str(datetime.now()), i['attach_path'], '', i['sender'], i['hospital'], i['folder'], 'utr_mails')
+                cur.execute(q, data)
+                con.commit()
+                data = (i['id'], i['subject'], i['date'])
+                q = "select sno from settlement_mails where id=%s and subject=%s and date=%s limit 1"
+                cur.execute(q, data)
+                r1 = cur.fetchone()
+                if r1 is not None:
+                    q = "insert into utr_mails (`hospital`,`utr`,`utr2`,`completed`,`sett_table_sno`,`id`,`subject`,`date`,`sys_time`,`attach_path`,`sender`,`folder`) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                    data = (
+                    i['hospital'], utr_orig, i['utr'], '', r1[0], i['id'], i['subject'], i['date'], str(datetime.now()),
+                    i['attach_path'], i['sender'], i['folder'])
+                    cur.execute(q, data)
+                    con.commit()
+        q = "update utr_mails_temp set completed='X' where utr like %s and completed='0'"
+        cur.execute(q, ('%' + utr + '%',))
+        con.commit()
+
 def main():
-    hos_settlement_group, utrs = {}, {}
+    hos_settlement_group, utrs, deferred = {}, {}, ''
     q = "select hosp_name, hosp_group from hos_settlement_group where active=1"
     with mysql.connector.connect(**conn_data) as con:
         cur = con.cursor()
@@ -508,6 +548,23 @@ def main():
         result = cur.fetchall()
         for utr, hosp_group in result:
             utrs[hosp_group].add(utr)
+    for group in utrs:
+        if group in hos_settlement_group and group in utrs:
+            hosp_list = hos_settlement_group[group]
+            utr_list = utrs[group]
+            for utr in utr_list:
+                ####for test purpose
+                # utr = 'CITIN21124472126'
+                ####
+                regex = re.compile(r'^[A-Za-z]+')
+                temp = regex.search(utr)
+                if temp is not None:
+                    utr2 = regex.sub('', utr)
+                    for hosp in hosp_list:
+                        search(utr2, hosp, deferred)
+                for hosp in hosp_list:
+                    search(utr, hosp, deferred)
+                process_utr_mails(utr)
         pass
 
 
@@ -515,5 +572,6 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    process_utr_mails('CITIN21124472126')
     pass
