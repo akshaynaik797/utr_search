@@ -72,8 +72,8 @@ hospital_data = {
     },
 }
 
-# for i in hospital_data:
-#     Path(os.path.join(i, "new_attach/")).mkdir(parents=True, exist_ok=True)
+for i in hospital_data:
+    Path(os.path.join(i, "new_attach/")).mkdir(parents=True, exist_ok=True)
 
 
 def file_no(len):

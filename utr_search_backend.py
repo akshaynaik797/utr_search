@@ -4,6 +4,7 @@ import imaplib
 import os.path
 import pickle
 import re
+import signal
 from pathlib import Path
 from datetime import datetime, timedelta
 import json
@@ -26,7 +27,7 @@ from email.header import decode_header
 
 from make_log import log_exceptions, custom_log_data
 from settings import mail_time, file_no, file_blacklist, conn_data, pdfconfig, format_date, save_attachment, \
-    hospital_data, interval, clean_filename
+    hospital_data, interval, clean_filename, time_out
 
 
 class TimeOutException(Exception):
@@ -151,6 +152,8 @@ def gmail_api(data, hosp, deferred, text):
                 else:
                     print("Message snippets:")
                     for message in messages[::-1]:
+                        signal.signal(signal.SIGALRM, alarm_handler)
+                        signal.alarm(time_out)
                         try:
                             id, subject, date, filename, sender = '', '', '', '', ''
                             msg = service.users().messages().get(userId='me', id=message['id']).execute()
@@ -262,6 +265,7 @@ def gmail_api(data, hosp, deferred, text):
                         except:
                             log_exceptions(id=id, hosp=hosp, folder=folder)
                             failed_mails(id, date, subject, hosp, folder)
+                        signal.alarm(0)
                 request = results.list_next(request, msg_col)
     except:
         log_exceptions(hosp=hosp)
@@ -298,6 +302,8 @@ def graph_api(data, hosp, deferred, text):
                                                headers={'Authorization': 'Bearer ' + result['access_token']}, ).json()
                     if 'value' in graph_data2:
                         for i in graph_data2['value']:
+                            signal.signal(signal.SIGALRM, alarm_handler)
+                            signal.alarm(time_out)
                             try:
                                 date, subject, attach_path, sender = '', '', '', ''
                                 format = "%Y-%m-%dT%H:%M:%SZ"
@@ -356,7 +362,7 @@ def graph_api(data, hosp, deferred, text):
                             except:
                                 log_exceptions(mid=i['id'], hosp=hosp, folder=folder)
                                 failed_mails(i['id'], date, subject, hosp, folder)
-
+                            signal.alarm(0)
                     else:
                         with open('logs/query.log', 'a') as fp:
                             print(query, file=fp)
@@ -386,6 +392,8 @@ def imap_(data, hosp, deferred, text):
             # _, message_numbers_raw = imap_server.search(None, 'ALL')
             _, message_numbers_raw = imap_server.search(None, f'(TEXT "{text}")')
             for message_number in message_numbers_raw[0].split():
+                signal.signal(signal.SIGALRM, alarm_handler)
+                signal.alarm(time_out)
                 try:
                     _, msg = imap_server.fetch(message_number, '(RFC822)')
                     message = email.message_from_bytes(msg[0][1])
@@ -430,6 +438,7 @@ def imap_(data, hosp, deferred, text):
                 except:
                     log_exceptions(subject=subject, date=date, hosp=hosp, folder=folder)
                     failed_mails(mid, date, subject, hosp, folder)
+                signal.alarm(0)
     except:
         log_exceptions(hosp=hosp)
 
@@ -529,6 +538,8 @@ def process_utr_mails(utr):
                     con.commit()
         q = "update utr_mails_temp set completed='X' where utr like %s and completed='0'"
         cur.execute(q, ('%' + utr + '%',))
+        q = "update settlement_utrs set search_completed='p' where utr=%s"
+        cur.execute(q, (utr,))
         con.commit()
 
 def main():
@@ -553,25 +564,23 @@ def main():
             hosp_list = hos_settlement_group[group]
             utr_list = utrs[group]
             for utr in utr_list:
-                ####for test purpose
-                # utr = 'CITIN21124472126'
-                ####
-                regex = re.compile(r'^[A-Za-z]+')
-                temp = regex.search(utr)
-                if temp is not None:
-                    utr2 = regex.sub('', utr)
+                try:
+                    ####for test purpose
+                    # utr = 'CITIN20051633245'
+                    # hosp_list = ['noble']
+                    ####
+                    regex = re.compile(r'^[A-Za-z]+')
+                    temp = regex.search(utr)
+                    if temp is not None:
+                        utr2 = regex.sub('', utr)
+                        for hosp in hosp_list:
+                            search(utr2, hosp, deferred)
                     for hosp in hosp_list:
-                        search(utr2, hosp, deferred)
-                for hosp in hosp_list:
-                    search(utr, hosp, deferred)
-                process_utr_mails(utr)
-        pass
-
-
-
-
+                        search(utr, hosp, deferred)
+                    process_utr_mails(utr)
+                except:
+                    log_exceptions(utr=utr)
 
 if __name__ == '__main__':
-    # main()
-    process_utr_mails('CITIN21124472126')
+    main()
     pass
