@@ -1,15 +1,5 @@
-import csv
-import re
-import mysql.connector
-
-from settings import conn_data
-
-with open('c2.csv') as csv_file:
-    csv_reader = csv.reader(csv_file, delimiter=',')
-    line_count = 0
-    with mysql.connector.connect(**conn_data) as con:
-        cur = con.cursor()
-        for row in csv_reader:
-            q = "insert into settlement_utrs (utr, hosp_group) values (%s, %s)"
-            cur.execute(q, (row[0], '2'))
-        con.commit()
+from utr_search_backend import insert_utr_mails_sett_mails
+a = ['a123', '123', '', 'asd16a5s4d', 'sub', 'date', 'sdfsd', 'asd', 'asdsa', 'asdasd']
+# insert_utr_mails_sett_mails(utr, utr2, sett_sno, id, subject, date, filepath, sender, hosp, folder)
+insert_utr_mails_sett_mails(*a)
+pass

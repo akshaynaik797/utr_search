@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, url_for
+from flask import Flask, request, jsonify, url_for, send_from_directory
 from flask_cors import CORS
 
 import mysql.connector
@@ -17,9 +17,18 @@ app.config['referrer_url'] = None
 def index():
     return url_for('index', _external=True)
 
+@app.route("/download")
+def download():
+    import os
+    aa = request.url_root
+    path = request.args.get('path')
+    folder, file = os.path.split(path)
+    return send_from_directory(folder, filename=file, as_attachment=True)
+
 @app.route("/getutrmails", methods=["POST"])
 def get_utr_mails():
     #add code for single utr
+    link_text = request.url_root + 'download?path='
     temp_dict = {}
     data = request.form.to_dict()
     fields = ("sno","hospital","utr","utr2","completed","sett_table_sno","id","subject","date","sys_time","attach_path","sender","folder")
@@ -35,6 +44,7 @@ def get_utr_mails():
                 temp = {}
                 for k, v in zip(fields, i):
                     temp[k] = v
+                temp['attach_path'] = link_text + temp['attach_path']
                 temp_dict[utr].append(temp)
             return temp_dict
 
@@ -51,6 +61,7 @@ def get_utr_mails():
                 temp = {}
                 for k, v in zip(fields, i):
                     temp[k] = v
+                temp['attach_path'] = link_text + temp['attach_path']
                 temp_dict[utr].append(temp)
     return temp_dict
 
