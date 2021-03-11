@@ -616,23 +616,25 @@ def main():
         result = cur.fetchall()
         for hosp_name, hosp_group in result:
             hos_settlement_group[hosp_group] = []
-            utrs[hosp_group] = set()
+            utrs[hosp_group] = []
         for hosp_name, hosp_group in result:
             hos_settlement_group[hosp_group].append(hosp_name)
         q = "select utr, hosp_group from settlement_utrs where search_completed=''"
         cur.execute(q)
         result = cur.fetchall()
         for utr, hosp_group in result:
-            utrs[hosp_group].add(utr)
+            utrs[hosp_group].append(utr)
     for group in utrs:
         if group in hos_settlement_group and group in utrs:
             hosp_list = hos_settlement_group[group]
             utr_list = utrs[group]
             for utr in utr_list:
                 try:
+                    print(utr)
+                    flag = 'p'
                     ####for test purpose
-                    # utr = 'CITIN20051633245'
-                    # hosp_list = ['noble']
+                    # utr = 'CITIN21122700962'
+                    # hosp_list = ['ils', 'ils_dumdum', 'ils_howrah', 'ils_agartala', 'ils_ho']
                     ####
                     utr2 = utr
                     regex = re.compile(r'^[A-Za-z]+')
@@ -643,8 +645,13 @@ def main():
                         search(utr, utr2, hosp, deferred)
                     with mysql.connector.connect(**conn_data) as con:
                         cur = con.cursor()
-                        q = "update settlement_utrs set search_completed='p' where utr=%s"
+                        q = 'select * from utr_mails where utr=%s limit 1'
                         cur.execute(q, (utr,))
+                        result = cur.fetchone()
+                        if result is None:
+                            flag = 'notfound'
+                        q = "update settlement_utrs set search_completed=%s where utr=%s"
+                        cur.execute(q, (flag, utr,))
                         con.commit()
                     # process_utr_mails(utr)
                 except:

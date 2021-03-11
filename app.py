@@ -29,7 +29,7 @@ def download():
 def get_utr_mails():
     #add code for single utr
     link_text = request.url_root + 'download?path='
-    temp_dict = {}
+    temp_dict = []
     data = request.form.to_dict()
     fields = ("sno","hospital","utr","utr2","completed","sett_table_sno","id","subject","date","sys_time","attach_path","sender","folder")
     with mysql.connector.connect(**conn_data) as con:
@@ -39,14 +39,13 @@ def get_utr_mails():
             q = "select * from utr_mails where utr=%s and completed=''"
             cur.execute(q, (utr,))
             result1 = cur.fetchall()
-            temp_dict[utr] = []
             for i in result1:
                 temp = {}
                 for k, v in zip(fields, i):
                     temp[k] = v
                 temp['attach_path'] = link_text + temp['attach_path']
-                temp_dict[utr].append(temp)
-            return temp_dict
+                temp_dict.append(temp)
+            return jsonify(temp_dict)
 
         q = "select distinct(utr) from utr_mails where completed=''"
         cur.execute(q)
@@ -64,6 +63,29 @@ def get_utr_mails():
                 temp['attach_path'] = link_text + temp['attach_path']
                 temp_dict[utr].append(temp)
     return temp_dict
+
+@app.route("/getutrs", methods=["POST"])
+def get_utrs():
+    data = request.form.to_dict()
+    with mysql.connector.connect(**conn_data) as con:
+        cur = con.cursor()
+        q = "select utr from settlement_utrs where search_completed!=''"
+        cur.execute(q)
+        result = cur.fetchall()
+        temp = [i[0] for i in result]
+        return jsonify(temp)
+    return []
+
+@app.route("/setutrflag", methods=["POST"])
+def set_utr_flag():
+    data = request.form.to_dict()
+    with mysql.connector.connect(**conn_data) as con:
+        cur = con.cursor()
+        q = "update settlement_utrs set search_completed='X' where utr=%s"
+        cur.execute(q, (data['utr'],))
+        con.commit()
+    return jsonify({"msg": "done"})
+
 
 @app.route("/setutrmails", methods=["POST"])
 def set_utr_mails():
