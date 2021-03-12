@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from flask import Flask, request, jsonify, url_for, send_from_directory
 from flask_cors import CORS
 
@@ -69,12 +71,12 @@ def get_utrs():
     data = request.form.to_dict()
     with mysql.connector.connect(**conn_data) as con:
         cur = con.cursor()
-        q = "select utr from settlement_utrs where search_completed!=''"
+        q = "select utr from settlement_utrs where search_completed!='X'"
         cur.execute(q)
         result = cur.fetchall()
-        temp = [i[0] for i in result]
+        temp = []
+        temp = [{"utr": i[0]} for i in result]
         return jsonify(temp)
-    return []
 
 @app.route("/setutrflag", methods=["POST"])
 def set_utr_flag():
@@ -89,11 +91,27 @@ def set_utr_flag():
 
 @app.route("/setutrmails", methods=["POST"])
 def set_utr_mails():
+    fields = ("sno","hospital","utr","utr2","completed","sett_table_sno","id","subject","date","sys_time","attach_path","sender","folder")
     data = request.form.to_dict()
     with mysql.connector.connect(**conn_data) as con:
         cur = con.cursor()
-        q = "update utr_mails set completed='X' where sno=%s"
-        cur.execute(q, (data['sno'],))
+        if 'insurer' not in data:
+            q = "update utr_mails set completed='X' where sno=%s"
+            cur.execute(q, (data['sno'],))
+        else:
+            #make entry in sett table
+            q = "select * from utr_mails where sno=%s limit 1"
+            cur.execute(q, (data['sno'],))
+            r = cur.fetchone()
+            if r is not None:
+                temp = {}
+                for k, v in zip(fields, r[0]):
+                    temp[k] = v
+                q = 'INSERT INTO settlement_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`folder`,`process`,`hospital`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'
+                data = (temp['id'], temp['subject'], temp['date'], str(datetime.now()), temp['filepath'], '', temp['sender'], temp['folder'], 'utr_mails', temp['hosp'])
+                cur.execute(q, data)
+                q = "update utr_mails set completed='X' where sno=%s and insurer=%s"
+                cur.execute(q, (data['sno'], data['insurer']))
         con.commit()
     return jsonify({"msg": "done"})
 

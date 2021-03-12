@@ -34,7 +34,7 @@ class TimeOutException(Exception):
     pass
 
 def insert_utr_mails_sett_mails(utr, utr2, sett_sno, id, subject, date, filepath, sender, hosp, folder):
-    insurer = ""
+    completed = ''
     with mysql.connector.connect(**conn_data) as con:
         cur = con.cursor()
         q = "select * from utr_mails where utr=%s and utr2=%s and sett_table_sno=%s and id=%s and subject=%s and date=%s"
@@ -42,11 +42,16 @@ def insert_utr_mails_sett_mails(utr, utr2, sett_sno, id, subject, date, filepath
         cur.execute(q, data)
         result = cur.fetchone()
         if result is None:
-            if sett_sno == '':
+            insurer, process = get_ins(subject, sender, date)
+            if process == 'settlement' and sett_sno == '':
                 #code to insert in sett
                 q = 'INSERT INTO settlement_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`folder`,`process`,`hospital`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'
                 data = (id, subject, date, str(datetime.now()), filepath, '', sender, folder, 'utr_mails', hosp)
                 cur.execute(q, data)
+                con.commit()
+                completed = 'MOVED'
+                q = "update settlement_utrs set search_completed=%s where utr=%s"
+                cur.execute(q, (completed, utr))
                 con.commit()
                 data = (id, subject, date)
                 q = "select sno from settlement_mails where id=%s and subject=%s and date=%s limit 1"
@@ -54,13 +59,8 @@ def insert_utr_mails_sett_mails(utr, utr2, sett_sno, id, subject, date, filepath
                 result = cur.fetchone()
                 if result is not None:
                     sett_sno = result[0]
-            q = "select IC_name.IC_name from IC_name inner join email_ids where email_ids=%s and email_ids.IC=IC_name.IC limit 1"
-            cur.execute(q, (sender,))
-            result = cur.fetchone()
-            if result is not None:
-                insurer = result[0]
             q = 'INSERT INTO `utr_mails` (`hospital`,`utr`,`utr2`,`completed`,`sett_table_sno`,`id`,`subject`,`date`,`sys_time`,`attach_path`,`sender`,`folder`,`insurer`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'
-            data = (hosp, utr, utr2, '', sett_sno, id, subject, date, str(datetime.now()), filepath, sender, folder, insurer)
+            data = (hosp, utr, utr2, completed, sett_sno, id, subject, date, str(datetime.now()), filepath, sender, folder, insurer)
             cur.execute(q, data)
             con.commit()
 
@@ -105,13 +105,13 @@ def create_settlement_folder(hosp, ins, date, filepath):
 
 def get_ins_process(subject, email):
     ins, process = "", ""
-    q1 = "select IC from email_ids where email_ids=%s"
+    q1 = "select IC from email_ids where email_ids=%s limit 1"
     q2 = "select subject, table_name from email_master where ic_id=%s"
-    q3 = "select IC_name from IC_name where IC=%s"
+    q3 = "select IC_name from IC_name where IC=%s limit 1"
     with mysql.connector.connect(**conn_data) as con:
-        cur = con.cursor()
+        cur = con.cursor(buffered=True)
         cur.execute(q1, (email,))
-        result =cur.fetchone()
+        result = cur.fetchone()
         if result is not None:
             ic_id = result[0]
             cur.execute(q2, (ic_id,))
@@ -127,6 +127,39 @@ def get_ins_process(subject, email):
                     if result1 is not None:
                         return (result1[0], pro)
     return ins, process
+
+def get_ins(subject, email, date):
+    ins, pro = '', ''
+    ins, pro = get_ins_process(subject, email)
+    if ins != '' and pro != '':
+        return ins, pro
+    else:
+        with mysql.connector.connect(**conn_data) as con:
+            cur = con.cursor()
+            q = "select attach_path from settlement_mails where subject=%s and date=%s limit 1"
+            cur.execute(q, (subject, date))
+            r = cur.fetchone()
+            if r is not None:
+                temp = re.compile(r'(?<=letters\/)[a-zA-Z]+').search(r[0])
+                if temp is not None:
+                    ins, pro = temp.group(), 'settlement'
+            else:
+                ins, pro = 'MULTIPLE', 'settlement'
+    return ins, pro
+    # q = "SELECT IC_name.IC_name, email_master.table_name, email_master.subject FROM IC_name inner join email_master where email_master.IC_ID =IC_name.IC and email_master.subject != '' and email_master.table_name='settlement'"
+    # with mysql.connector.connect(**conn_data) as con:
+    #     cur = con.cursor()
+    #     cur.execute(q)
+    #     result = cur.fetchall()
+    #     if result is not None:
+    #         for ins, pro, sub in result:
+    #             if 'Intimation No' in subject:
+    #                 ins_process.append(('big', 'settlement'))
+    #             if 'STAR HEALTH AND ALLIED INSUR04239' in subject:
+    #                 ins_process.append(('small', 'settlement'))
+    #             if sub in subject:
+    #                 ins_process.append((ins, pro))
+    # return ins_process
 
 def get_folders(hospital, deferred):
     result = []
