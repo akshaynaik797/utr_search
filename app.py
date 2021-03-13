@@ -88,7 +88,6 @@ def set_utr_flag():
         con.commit()
     return jsonify({"msg": "done"})
 
-
 @app.route("/setutrmails", methods=["POST"])
 def set_utr_mails():
     fields = ("sno","hospital","utr","utr2","completed","sett_table_sno","id","subject","date","sys_time","attach_path","sender","folder")
@@ -118,6 +117,24 @@ def set_utr_mails():
                 cur.execute(q, (data['sno'], data['insurer']))
         con.commit()
     return jsonify({"msg": "done"})
+
+@app.route("/getutrbreakup", methods=["POST"])
+def get_utr_breakup():
+    records = []
+    fields = ("utrNo","insRefNo","policyNo","claimNo","patientName","grossAmount","tds","netAmount","tpaNo","hospital")
+    data = request.form.to_dict()
+    q = "select City_Records.City_Transaction_Reference,NIC_Records.Transaction_Reference_No,NIC_Records.Policy_Number,NIC_Records.Claim_Number,NIC_Records.Name_Of_Patient,NIC_Records.Gross_Amounts,NIC_Records.tds,NIC_Records.Net_Amount,NIC_Records.tpa_No,NIC_Records.hospital from NIC_Records inner join City_Records where City_Records.City_Transaction_Reference=%s and City_Records.NIA_Transaction_Reference=NIC_Records.Transaction_Reference_No"
+    with mysql.connector.connect(**conn_data) as con:
+        cur = con.cursor()
+        cur.execute(q, (data['utrNo'],))
+        result = cur.fetchall()
+        for row in result:
+            temp = {}
+            for k, v in zip(fields, row):
+                temp[k] = v
+            records.append(temp)
+    return jsonify(records)
+
 
 def set_utr_mails_flag(sno):
     q = "INSERT INTO utr_mails_copy SELECT * FROM utr_mails WHERE sno=%s; DELETE FROM utr_mails WHERE sno=%s;"
