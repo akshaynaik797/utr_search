@@ -94,12 +94,16 @@ def set_utr_mails():
     fields = ("sno","hospital","utr","utr2","completed","sett_table_sno","id","subject","date","sys_time","attach_path","sender","folder")
     data = request.form.to_dict()
     with mysql.connector.connect(**conn_data) as con:
+        # make fun for moving from utr_mails to utr_copy and delete
         cur = con.cursor()
-        if 'insurer' not in data:
-            q = "update utr_mails set completed='X' where sno=%s"
+        if 'utr' in data:
+            q = "update utr_mails set completed='D' where utr=%s"
+            cur.execute(q, (data['utr'],))
+        if 'sno' in data:
+            q = "update utr_mails set completed='D' where sno=%s"
             cur.execute(q, (data['sno'],))
-        else:
-            #make entry in sett table
+            set_utr_mails_flag(data['sno'])
+        if 'insurer' in data and 'sno' in data:
             q = "select * from utr_mails where sno=%s limit 1"
             cur.execute(q, (data['sno'],))
             r = cur.fetchone()
@@ -110,10 +114,31 @@ def set_utr_mails():
                 q = 'INSERT INTO settlement_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`folder`,`process`,`hospital`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'
                 data = (temp['id'], temp['subject'], temp['date'], str(datetime.now()), temp['filepath'], '', temp['sender'], temp['folder'], 'utr_mails', temp['hosp'])
                 cur.execute(q, data)
-                q = "update utr_mails set completed='X' where sno=%s and insurer=%s"
+                q = "update utr_mails set completed='MOVED' where sno=%s and insurer=%s"
                 cur.execute(q, (data['sno'], data['insurer']))
         con.commit()
     return jsonify({"msg": "done"})
+
+def set_utr_mails_flag(sno):
+    q = "INSERT INTO utr_mails_copy SELECT * FROM utr_mails WHERE sno=%s; DELETE FROM utr_mails WHERE sno=%s;"
+    with mysql.connector.connect(**conn_data) as con:
+        cur = con.cursor()
+        for i in q.split(';'):
+            cur.execute(i, (sno,))
+        con.commit()
+        q = "select utr from utr_mails_copy where sno=%s limit 1"
+        cur.execute(q, (sno,))
+        r = cur.fetchone()
+        if r is not None:
+            utr = r[0]
+            q = "select * from utr_mails where utr=%s"
+            cur.execute(q, (utr,))
+            r1 = cur.fetchall()
+            for i in r1:
+                q = "update settlement_utrs set search_completed='X' where utr=%s"
+                cur.execute(q, (utr,))
+                con.commit()
+                break
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=9984)

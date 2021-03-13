@@ -43,7 +43,7 @@ def insert_utr_mails_sett_mails(utr, utr2, sett_sno, id, subject, date, filepath
         result = cur.fetchone()
         if result is None:
             insurer, process = get_ins(subject, sender, date)
-            if process == 'settlement' and sett_sno == '':
+            if process == 'settlement' and sett_sno == '' and insurer != 'MULTIPLE':
                 #code to insert in sett
                 q = 'INSERT INTO settlement_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`folder`,`process`,`hospital`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'
                 data = (id, subject, date, str(datetime.now()), filepath, '', sender, folder, 'utr_mails', hosp)
@@ -131,7 +131,7 @@ def get_ins_process(subject, email):
 def get_ins(subject, email, date):
     ins, pro = '', ''
     ins, pro = get_ins_process(subject, email)
-    if ins != '' and pro != '':
+    if ins != '' and pro != '' and pro == 'settlement':
         return ins, pro
     else:
         with mysql.connector.connect(**conn_data) as con:
@@ -143,23 +143,26 @@ def get_ins(subject, email, date):
                 temp = re.compile(r'(?<=letters\/)[a-zA-Z]+').search(r[0])
                 if temp is not None:
                     ins, pro = temp.group(), 'settlement'
-            else:
-                ins, pro = 'MULTIPLE', 'settlement'
-    return ins, pro
-    # q = "SELECT IC_name.IC_name, email_master.table_name, email_master.subject FROM IC_name inner join email_master where email_master.IC_ID =IC_name.IC and email_master.subject != '' and email_master.table_name='settlement'"
-    # with mysql.connector.connect(**conn_data) as con:
-    #     cur = con.cursor()
-    #     cur.execute(q)
-    #     result = cur.fetchall()
-    #     if result is not None:
-    #         for ins, pro, sub in result:
-    #             if 'Intimation No' in subject:
-    #                 ins_process.append(('big', 'settlement'))
-    #             if 'STAR HEALTH AND ALLIED INSUR04239' in subject:
-    #                 ins_process.append(('small', 'settlement'))
-    #             if sub in subject:
-    #                 ins_process.append((ins, pro))
-    # return ins_process
+                    return ins, pro
+    q = "SELECT IC_name.IC_name, email_master.table_name, email_master.subject FROM IC_name inner join email_master where email_master.IC_ID =IC_name.IC and email_master.subject != '' and email_master.table_name='settlement'"
+    ins_process = []
+    with mysql.connector.connect(**conn_data) as con:
+        cur = con.cursor()
+        cur.execute(q)
+        result = cur.fetchall()
+        if result is not None:
+            for ins, pro, sub in result:
+                if 'Intimation No' in subject:
+                    ins_process.append(('big', 'settlement'))
+                if 'STAR HEALTH AND ALLIED INSUR04239' in subject:
+                    ins_process.append(('small', 'settlement'))
+                if sub in subject:
+                    ins_process.append((ins, pro))
+    if len(ins_process) > 0:
+        return 'MULTIPLE', 'settlement'
+    else:
+        return '', ''
+
 
 def get_folders(hospital, deferred):
     result = []
@@ -663,12 +666,12 @@ def main():
             utr_list = utrs[group]
             for utr in utr_list:
                 try:
-                    print(utr)
-                    flag = 'p'
                     ####for test purpose
-                    # utr = 'CITIN21122700962'
+                    # utr = 'SIN02418Q1047845'
                     # hosp_list = ['ils', 'ils_dumdum', 'ils_howrah', 'ils_agartala', 'ils_ho']
                     ####
+                    print(utr)
+                    flag = 'p'
                     utr2 = utr
                     regex = re.compile(r'^[A-Za-z]+')
                     temp = regex.search(utr)
@@ -683,10 +686,9 @@ def main():
                         result = cur.fetchone()
                         if result is None:
                             flag = 'notfound'
-                        q = "update settlement_utrs set search_completed=%s where utr=%s"
-                        cur.execute(q, (flag, utr,))
-                        con.commit()
-                    # process_utr_mails(utr)
+                    q = "update settlement_utrs set search_completed=%s where utr=%s"
+                    cur.execute(q, (flag, utr,))
+                    con.commit()
                 except:
                     log_exceptions(utr=utr)
 

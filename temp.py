@@ -1,4 +1,3 @@
-from utr_search_backend import get_from_settlement
+from app import set_utr_mails_flag
 
-a = get_from_settlement('mid', 'subject', 'date')
-pass
+set_utr_mails_flag('7311')
