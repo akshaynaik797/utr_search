@@ -686,9 +686,11 @@ def main():
                         result = cur.fetchone()
                         if result is None:
                             flag = 'notfound'
-                    q = "update settlement_utrs set search_completed=%s where utr=%s"
-                    cur.execute(q, (flag, utr,))
-                    con.commit()
+                    with mysql.connector.connect(**conn_data) as con:
+                        cur = con.cursor()
+                        q = "update settlement_utrs set search_completed=%s where utr=%s"
+                        cur.execute(q, (flag, utr,))
+                        con.commit()
                 except:
                     log_exceptions(utr=utr)
 
