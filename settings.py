@@ -75,6 +75,18 @@ hospital_data = {
 for i in hospital_data:
     Path(os.path.join(i, "new_attach/")).mkdir(parents=True, exist_ok=True)
 
+def gen_dict_extract(key, var):
+    if isinstance(var,(list, tuple, dict)):
+        for k, v in var.items():
+            if k == key:
+                yield v
+            if isinstance(v, dict):
+                for result in gen_dict_extract(key, v):
+                    yield result
+            elif isinstance(v, list):
+                for d in v:
+                    for result in gen_dict_extract(key, d):
+                        yield result
 
 def file_no(len):
     return str(randint((10 ** (len - 1)), 10 ** len)) + '_'

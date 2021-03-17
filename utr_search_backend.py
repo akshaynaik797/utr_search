@@ -27,7 +27,7 @@ from email.header import decode_header
 
 from make_log import log_exceptions, custom_log_data
 from settings import mail_time, file_no, file_blacklist, conn_data, pdfconfig, format_date, save_attachment, \
-    hospital_data, interval, clean_filename, time_out
+    hospital_data, interval, clean_filename, time_out, gen_dict_extract
 
 
 class TimeOutException(Exception):
@@ -284,7 +284,10 @@ def gmail_api(data, hosp, deferred, utr, utr2):
                                         if flag == 0:
                                             for j in msg['payload']['parts']:
                                                 if j['filename'] == '':
-                                                    data = j['body']['data']
+                                                    try:
+                                                        data = j['body']['data']
+                                                    except KeyError:
+                                                        data = gen_dict_extract('data', j)[-1]
                                                     filename = attach_path + file_no(8) + '.pdf'
                                                     with open(attach_path + 'temp.html', 'wb') as fp:
                                                         fp.write(base64.urlsafe_b64decode(data))
