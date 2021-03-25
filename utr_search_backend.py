@@ -178,6 +178,9 @@ def get_folders(hospital, deferred):
     return result
 
 def if_exists(**kwargs):
+    for i in kwargs:
+        if kwargs[i] is None:
+            return True
     q = f"select * from {kwargs['hosp']}_mails where subject=%s and date=%s and id=%s limit 1"
     data = (kwargs['subject'], kwargs['date'], kwargs['id'])
     with mysql.connector.connect(**conn_data) as con:
@@ -287,7 +290,7 @@ def gmail_api(data, hosp, deferred, utr, utr2):
                                                     try:
                                                         data = j['body']['data']
                                                     except KeyError:
-                                                        data = gen_dict_extract('data', j)[-1]
+                                                        data = [i for i in gen_dict_extract('data', j)][-1]
                                                     filename = attach_path + file_no(8) + '.pdf'
                                                     with open(attach_path + 'temp.html', 'wb') as fp:
                                                         fp.write(base64.urlsafe_b64decode(data))
@@ -675,6 +678,11 @@ def main():
                     ####
                     print(utr)
                     flag = 'p'
+                    with mysql.connector.connect(**conn_data) as con:
+                        cur = con.cursor()
+                        q = "update settlement_utrs set search_completed=%s where utr=%s"
+                        cur.execute(q, (flag, utr,))
+                        con.commit()
                     utr2 = utr
                     regex = re.compile(r'^[A-Za-z]+')
                     temp = regex.search(utr)
@@ -689,11 +697,11 @@ def main():
                         result = cur.fetchone()
                         if result is None:
                             flag = 'notfound'
-                    with mysql.connector.connect(**conn_data) as con:
-                        cur = con.cursor()
-                        q = "update settlement_utrs set search_completed=%s where utr=%s"
-                        cur.execute(q, (flag, utr,))
-                        con.commit()
+                            with mysql.connector.connect(**conn_data) as con:
+                                cur = con.cursor()
+                                q = "update settlement_utrs set search_completed=%s where utr=%s"
+                                cur.execute(q, (flag, utr,))
+                                con.commit()
                 except:
                     log_exceptions(utr=utr)
 
