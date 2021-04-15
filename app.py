@@ -83,8 +83,8 @@ def set_utr_flag():
     data = request.form.to_dict()
     with mysql.connector.connect(**conn_data) as con:
         cur = con.cursor()
-        q = "update settlement_utrs set search_completed='X' where utr=%s"
-        cur.execute(q, (data['utr'],))
+        q = "update settlement_utrs set search_completed='X' where utr=%s and sno=%s"
+        cur.execute(q, (data['utr'], data['sno']))
         con.commit()
     return jsonify({"msg": "done"})
 
