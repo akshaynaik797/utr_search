@@ -45,6 +45,7 @@ def insert_utr_mails_sett_mails(utr, utr2, sett_sno, id, subject, date, filepath
             insurer, process = get_ins(subject, sender, date)
             if process == 'settlement' and sett_sno == '' and insurer != 'MULTIPLE':
                 #code to insert in sett
+                filepath = create_settlement_folder(hosp, insurer, date, filepath)
                 q = 'INSERT INTO settlement_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`folder`,`process`,`hospital`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'
                 data = (id, subject, date, str(datetime.now()), filepath, '', sender, folder, 'utr_mails', hosp)
                 cur.execute(q, data)
@@ -94,14 +95,18 @@ def failed_mails(mid, date, subject, hospital, folder):
             con.commit()
 
 def create_settlement_folder(hosp, ins, date, filepath):
+    root = '../index/'
+    dst = ""
     try:
         date = datetime.strptime(date, '%d/%m/%Y %H:%M:%S').strftime('%m%d%Y%H%M%S')
-        folder = os.path.join(hosp, "letters", f"{ins}_{date}")
+        today = datetime.now().strftime("%d_%m_%Y")
+        folder = os.path.join(root, today, hosp, "letters", f"{ins}_{date}")
         dst = os.path.join(folder, os.path.split(filepath)[-1])
         Path(folder).mkdir(parents=True, exist_ok=True)
         copyfile(filepath, dst)
     except:
         log_exceptions(hosp=hosp, ins=ins, date=date, filepath=filepath)
+    return os.path.abspath(dst)
 
 def get_ins_process(subject, email):
     ins, process = "", ""
@@ -628,6 +633,8 @@ def process_utr_mails(utr):
                 cur.execute(q, data)
                 con.commit()
             else:
+                insurer, process = get_ins(i['subject'], i['sender'], i['date'])
+                i['attach_path'] = create_settlement_folder(i['hospital'], insurer, i['date'], i['attach_path'])
                 q = "insert into settlement_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`hospital`,`folder`,`process`) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
                 data = (i['id'], i['subject'], i['date'], str(datetime.now()), i['attach_path'], '', i['sender'], i['hospital'], i['folder'], 'utr_mails')
                 cur.execute(q, data)
@@ -637,8 +644,8 @@ def process_utr_mails(utr):
                 cur.execute(q, data)
                 r1 = cur.fetchone()
                 if r1 is not None:
-                    q = "insert into utr_mails (`hospital`,`utr`,`utr2`,`completed`,`sett_table_sno`,`id`,`subject`,`date`,`sys_time`,`attach_path`,`sender`,`folder`) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-                    data = (
+                    q = "insert into utr_mails (`insurer`, `hospital`,`utr`,`utr2`,`completed`,`sett_table_sno`,`id`,`subject`,`date`,`sys_time`,`attach_path`,`sender`,`folder`) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                    data = (insurer,
                     i['hospital'], utr_orig, i['utr'], '', r1[0], i['id'], i['subject'], i['date'], str(datetime.now()),
                     i['attach_path'], i['sender'], i['folder'])
                     cur.execute(q, data)

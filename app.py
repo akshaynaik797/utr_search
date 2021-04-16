@@ -6,6 +6,7 @@ from flask_cors import CORS
 import mysql.connector
 
 from settings import conn_data
+from utr_search_backend import create_settlement_folder
 
 app = Flask(__name__)
 cors = CORS(app)
@@ -90,6 +91,7 @@ def set_utr_flag():
 
 @app.route("/setutrmails", methods=["POST"])
 def set_utr_mails():
+    #make settlement folder stucture
     fields = ("sno","hospital","utr","utr2","completed","sett_table_sno","id","subject","date","sys_time","attach_path","sender","folder")
     data = request.form.to_dict()
     with mysql.connector.connect(**conn_data) as con:
@@ -98,24 +100,37 @@ def set_utr_mails():
         if 'utr' in data:
             q = "update utr_mails set completed='D' where utr=%s"
             cur.execute(q, (data['utr'],))
-        if 'sno' in data:
+            con.commit()
+        if 'sno' in data and 'insurer' not in data:
             q = "update utr_mails set completed='D' where sno=%s"
             cur.execute(q, (data['sno'],))
+            con.commit()
             set_utr_mails_flag(data['sno'])
         if 'insurer' in data and 'sno' in data:
-            q = "select * from utr_mails where sno=%s limit 1"
-            cur.execute(q, (data['sno'],))
-            r = cur.fetchone()
-            if r is not None:
-                temp = {}
-                for k, v in zip(fields, r[0]):
-                    temp[k] = v
-                q = 'INSERT INTO settlement_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`folder`,`process`,`hospital`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'
-                data = (temp['id'], temp['subject'], temp['date'], str(datetime.now()), temp['filepath'], '', temp['sender'], temp['folder'], 'utr_mails', temp['hosp'])
-                cur.execute(q, data)
-                q = "update utr_mails set completed='MOVED' where sno=%s and insurer=%s"
-                cur.execute(q, (data['sno'], data['insurer']))
-        con.commit()
+            if data['insurer'] == '_blank':
+                q = "update utr_mails set completed='D' where sno=%s"
+                cur.execute(q, (data['sno'],))
+                con.commit()
+            else:
+                q = "select * from utr_mails where sno=%s limit 1"
+                cur.execute(q, (data['sno'],))
+                r = cur.fetchone()
+                if r is not None:
+                    temp = {}
+                    for k, v in zip(fields, r):
+                        temp[k] = v
+                    file_path = create_settlement_folder(temp['hospital'], data['insurer'], temp['date'], temp['attach_path'])
+                    q = 'INSERT INTO settlement_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`folder`,`process`,`hospital`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'
+                    data1 = (temp['id'], temp['subject'], temp['date'], str(datetime.now()), file_path, '', temp['sender'], temp['folder'], 'utr_mails', temp['hospital'])
+                    cur.execute(q, data1)
+                    con.commit()
+                    q = 'select sno from settlement_mails where id=%s and subject=%s and date=%s limit 1;'
+                    data1 = (temp['id'], temp['subject'], temp['date'])
+                    cur.execute(q, data1)
+                    sett_sno = cur.fetchone()[0]
+                    q = "update utr_mails set completed='MOVED', insurer=%s, sett_table_sno=%s where sno=%s"
+                    cur.execute(q, (data['insurer'], sett_sno, data['sno']))
+                    con.commit()
     return jsonify({"msg": "done"})
 
 @app.route("/getutrbreakup", methods=["POST"])
