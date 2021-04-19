@@ -75,6 +75,19 @@ def get_from_settlement(mid, subject, date):
         if result is not None:
             return list(result)
 
+def if_gn_in_utr(utr):
+    pro_utr = utr
+    if 'GN' in pro_utr:
+        if pro_utr[0] == '0':
+            pro_utr = pro_utr[1:]
+        else:
+            pro_utr = '0' + pro_utr
+        q = "update settlement_utrs set utr=%s where utr=%s"
+        with mysql.connector.connect(**conn_data) as con:
+            cur = con.cursor()
+            cur.execute(q, (pro_utr, utr))
+            con.commit()
+    return pro_utr
 
 def alarm_handler(signum, frame):
     print("ALARM signal received")
@@ -167,7 +180,6 @@ def get_ins(subject, email, date):
         return 'MULTIPLE', 'settlement'
     else:
         return '', ''
-
 
 def get_folders(hospital, deferred):
     result = []
@@ -679,10 +691,7 @@ def main():
             utr_list = utrs[group]
             for utr in utr_list:
                 try:
-                    ####for test purpose
-                    # utr = 'SIN02418Q1047845'
-                    # hosp_list = ['ils', 'ils_dumdum', 'ils_howrah', 'ils_agartala', 'ils_ho']
-                    ####
+                    utr = if_gn_in_utr(utr)
                     print(utr)
                     flag = 'p'
                     with mysql.connector.connect(**conn_data) as con:

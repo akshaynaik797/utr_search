@@ -1,4 +1,4 @@
-from utr_search_backend import create_settlement_folder
+from utr_search_backend import if_gn_in_utr
 
-a = create_settlement_folder('ils_ho', ins, date, filepath)
+a = if_gn_in_utr('0ADSADA')
 pass
