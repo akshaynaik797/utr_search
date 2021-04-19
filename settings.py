@@ -135,7 +135,6 @@ def remove_img_tags(data):
     p = re.compile(r'<img.*?>')
     return p.sub('', data)
 
-
 def format_date(date):
     date = date.split(',')[-1].strip()
     format = '%d %b %Y %H:%M:%S %z'
@@ -154,7 +153,6 @@ def format_date(date):
     format1 = '%d/%m/%Y %H:%M:%S'
     date = date.strftime(format1)
     return date
-
 
 def save_attachment(msg, download_folder, **kwargs):
     """
@@ -205,3 +203,11 @@ def save_attachment(msg, download_folder, **kwargs):
                 att_path = os.path.join(download_folder, filename)
                 pass
     return att_path
+
+def html_to_pdf(src, dst):
+    with open(src, 'r') as fp:
+        data = fp.read()
+    data = remove_img_tags(data)
+    with open(src, 'w') as fp:
+        fp.write(data)
+    pdfkit.from_file(src, dst, configuration=pdfconfig)

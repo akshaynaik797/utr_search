@@ -27,7 +27,7 @@ from email.header import decode_header
 
 from make_log import log_exceptions, custom_log_data
 from settings import mail_time, file_no, file_blacklist, conn_data, pdfconfig, format_date, save_attachment, \
-    hospital_data, interval, clean_filename, time_out, gen_dict_extract
+    hospital_data, interval, clean_filename, time_out, gen_dict_extract, html_to_pdf
 
 
 class TimeOutException(Exception):
@@ -312,8 +312,9 @@ def gmail_api(data, hosp, deferred, utr, utr2):
                                                     with open(attach_path + 'temp.html', 'wb') as fp:
                                                         fp.write(base64.urlsafe_b64decode(data))
                                                     print(filename)
-                                                    pdfkit.from_file(attach_path + 'temp.html', filename,
-                                                                     configuration=pdfconfig)
+                                                    # pdfkit.from_file(attach_path + 'temp.html', filename,
+                                                    #                  configuration=pdfconfig)
+                                                    html_to_pdf(attach_path + 'temp.html', filename)
                                                     flag = 1
                                     else:
                                         data = msg['payload']['body']['data']
@@ -321,7 +322,8 @@ def gmail_api(data, hosp, deferred, utr, utr2):
                                         with open(attach_path + 'temp.html', 'wb') as fp:
                                             fp.write(base64.urlsafe_b64decode(data))
                                         print(filename)
-                                        pdfkit.from_file(attach_path + 'temp.html', filename, configuration=pdfconfig)
+                                        # pdfkit.from_file(attach_path + 'temp.html', filename, configuration=pdfconfig)
+                                        html_to_pdf(attach_path + 'temp.html', filename)
                                         flag = 1
                                     if flag == 0:
                                         if 'data' in msg['payload']['parts'][-1]['body']:
@@ -330,7 +332,8 @@ def gmail_api(data, hosp, deferred, utr, utr2):
                                             with open(attach_path + 'temp.html', 'wb') as fp:
                                                 fp.write(base64.urlsafe_b64decode(data))
                                             print(filename)
-                                            pdfkit.from_file(attach_path + 'temp.html', filename, configuration=pdfconfig)
+                                            # pdfkit.from_file(attach_path + 'temp.html', filename, configuration=pdfconfig)
+                                            html_to_pdf(attach_path + 'temp.html', filename)
                                             flag = 1
                                         else:
                                             if 'data' in msg['payload']['parts'][0]['parts'][-1]['body']:
@@ -339,7 +342,8 @@ def gmail_api(data, hosp, deferred, utr, utr2):
                                                 with open(attach_path + 'temp.html', 'wb') as fp:
                                                     fp.write(base64.urlsafe_b64decode(data))
                                                 print(filename)
-                                                pdfkit.from_file(attach_path + 'temp.html', filename, configuration=pdfconfig)
+                                                # pdfkit.from_file(attach_path + 'temp.html', filename, configuration=pdfconfig)
+                                                html_to_pdf(attach_path + 'temp.html', filename)
                                                 flag = 1
                                             else:
                                                 data = msg['payload']['parts'][0]['parts'][-1]['parts'][-1]['body']['data']
@@ -347,7 +351,8 @@ def gmail_api(data, hosp, deferred, utr, utr2):
                                                 with open(attach_path + 'temp.html', 'wb') as fp:
                                                     fp.write(base64.urlsafe_b64decode(data))
                                                 print(filename)
-                                                pdfkit.from_file(attach_path + 'temp.html', filename, configuration=pdfconfig)
+                                                # pdfkit.from_file(attach_path + 'temp.html', filename, configuration=pdfconfig)
+                                                html_to_pdf(attach_path + 'temp.html', filename)
                                                 flag = 1
                                     mail_attach_filepath = filename
                                     if mail_attach_filepath != '':
@@ -446,12 +451,14 @@ def graph_api(data, hosp, deferred, utr, utr2):
                                             if i['body']['contentType'] == 'html':
                                                 with open(attachfile_path + 'temp.html', 'w') as fp:
                                                     fp.write(i['body']['content'])
-                                                pdfkit.from_file(attachfile_path +'temp.html', filename, configuration=pdfconfig)
+                                                # pdfkit.from_file(attachfile_path +'temp.html', filename, configuration=pdfconfig)
+                                                html_to_pdf(attachfile_path + 'temp.html', filename)
                                                 attach_path = filename
                                             elif i['body']['contentType'] == 'text':
                                                 with open(attachfile_path + 'temp.text', 'w') as fp:
                                                     fp.write(i['body']['content'])
-                                                pdfkit.from_file(attachfile_path + 'temp.text', filename, configuration=pdfconfig)
+                                                # pdfkit.from_file(attachfile_path + 'temp.text', filename, configuration=pdfconfig)
+                                                html_to_pdf(attachfile_path + 'temp.text', filename)
                                                 attach_path = filename
                                         mail_attach_filepath = attach_path
                                         if mail_attach_filepath != '':
@@ -533,7 +540,8 @@ def imap_(data, hosp, deferred, utr, utr2):
                             a = save_attachment(message, attachfile_path, email=sender)
                             if not isinstance(a, list):
                                 filename = attachfile_path + file_no(8) + '.pdf'
-                                pdfkit.from_file(a, filename, configuration=pdfconfig)
+                                # pdfkit.from_file(a, filename, configuration=pdfconfig)
+                                html_to_pdf(a, filename)
                             else:
                                 filename = a[-1]
                             mail_attach_filepath = filename
