@@ -28,6 +28,63 @@ def download():
     folder, file = os.path.split(path)
     return send_from_directory(folder, filename=file, as_attachment=True)
 
+@app.route("/getallmails", methods=["POST"])
+def get_all_mails():
+    temp_dict = []
+    fields = ["id","subject","date","sys_time","attach_path","completed","sender","hospital","insurer","process","deferred","sno","mail_folder"]
+    link_text = request.url_root + 'download?path='
+    with mysql.connector.connect(**conn_data) as con:
+        cur = con.cursor()
+        q = "select * from all_mails where attach_path != '' and process = ''"
+        cur.execute(q)
+        result1 = cur.fetchall()
+        for i in result1:
+            temp = {}
+            for k, v in zip(fields, i):
+                temp[k] = v
+            temp['attach_path'] = link_text + temp['attach_path']
+            temp_dict.append(temp)
+        return jsonify(temp_dict)
+
+@app.route("/moveinsett", methods=["POST"])
+def move_in_sett():
+    fields = ["id","subject","date","sys_time","attach_path","completed","sender","hospital","insurer","process","deferred","sno","mail_folder"]
+    data = request.form.to_dict()
+    temp = {}
+
+    q = "update all_mails set "
+    params = []
+    for i in data:
+        if i in fields and i != 'sno':
+            q = q + f"`{i}`=%s, "
+            params.append(data[i])
+    q = q + "where `sno`=%s"
+    params.append(data['sno'])
+    q = q.replace(', where', ' where')
+
+    with mysql.connector.connect(**conn_data) as con:
+        cur = con.cursor()
+        cur.execute(q, params)
+        con.commit()
+
+    with mysql.connector.connect(**conn_data) as con:
+        cur = con.cursor()
+        q = "select * from all_mails where sno=%s limit 1"
+        cur.execute(q, (data['sno'],))
+        result1 = cur.fetchone()
+        for k, v in zip(fields, result1):
+            temp[k] = v
+        file_path = create_settlement_folder(temp['hospital'], data['insurer'], temp['date'], temp['attach_path'])
+        q = 'INSERT INTO settlement_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`folder`,`process`,`hospital`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'
+        data1 = (
+        temp['id'], temp['subject'], temp['date'], str(datetime.now()), file_path, '', temp['sender'], '',
+        'all_mails_set_api', temp['hospital'])
+        cur.execute(q, data1)
+        q = "update all_mails set completed='FIXED_INFO' where sno=%s"
+        cur.execute(q, (data['sno'],))
+        con.commit()
+    return jsonify("done")
+
 @app.route("/getutrmails", methods=["POST"])
 def get_utr_mails():
     #add code for single utr

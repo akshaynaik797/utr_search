@@ -1,4 +1,14 @@
-from utr_search_backend import if_gn_in_utr
+fields = ["id", "subject", "date", "sys_time", "attach_path", "completed", "sender", "hospital", "insurer", "process",
+          "deferred", "sno", "mail_folder"]
+data = {'id': 'sad', "subject": 'asddas', "sno": '123'}
 
-a = if_gn_in_utr('0ADSADA')
+q = "update all_mails set "
+params = []
+for i in data:
+    if i in fields and i != 'sno':
+        q = q + f"`{i}`=%s, "
+        params.append(data[i])
+q = q + "where `sno`=%s"
+params.append(data['sno'])
+q = q.replace(', where', ' where')
 pass
