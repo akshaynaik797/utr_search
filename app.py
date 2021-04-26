@@ -31,12 +31,13 @@ def download():
 @app.route("/getallmails", methods=["POST"])
 def get_all_mails():
     temp_dict = []
+    data = request.form.to_dict()
     fields = ["id","subject","date","sys_time","attach_path","completed","sender","hospital","insurer","process","deferred","sno","mail_folder"]
     link_text = request.url_root + 'download?path='
     with mysql.connector.connect(**conn_data) as con:
         cur = con.cursor()
-        q = "select * from all_mails where attach_path != '' and process = ''"
-        cur.execute(q)
+        q = "select * from all_mails where hospital=%s and attach_path is not null and attach_path != '' and process is not null and process!=''"
+        cur.execute(q, (data['hospital'],))
         result1 = cur.fetchall()
         for i in result1:
             temp = {}
