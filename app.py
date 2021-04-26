@@ -36,7 +36,7 @@ def get_all_mails():
     link_text = request.url_root + 'download?path='
     with mysql.connector.connect(**conn_data) as con:
         cur = con.cursor()
-        q = "select * from all_mails where hospital=%s and attach_path is not null and attach_path != '' and process is not null and process!=''"
+        q = "select * from all_mails where subject like '%ettlement%' and  hospital=%s and attach_path is not null and attach_path != '' and process is not null and process!=''"
         cur.execute(q, (data['hospital'],))
         result1 = cur.fetchall()
         for i in result1:
