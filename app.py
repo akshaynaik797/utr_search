@@ -67,8 +67,8 @@ def move_in_sett():
             q = q + f"`{i}`=%s, "
             params.append(data[i])
     if 'sno' in data:
-        q = q + "where subject like %s and `sno`=%s"
-        params.extend(['%ettlement%', data['sno']])
+        q = q + "where `sno`=%s"
+        params.extend([data['sno']])
     elif 'sender' in data:
         q = q + "where subject like %s and `sender`=%s"
         params.extend(['%ettlement%', data['sender']])
@@ -84,8 +84,8 @@ def move_in_sett():
             cur.execute(q, (data['sno'],))
             result1 = cur.fetchall()
         elif 'sender' in data:
-            q = "select * from all_mails where sender=%s"
-            cur.execute(q, (data['sender'],))
+            q = "select * from all_mails where subject like %s and sender=%s"
+            cur.execute(q, ('%ettlement%', data['sender'],))
             result1 = cur.fetchall()
     with mysql.connector.connect(**conn_data) as con:
         cur = con.cursor()
