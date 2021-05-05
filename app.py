@@ -67,11 +67,11 @@ def move_in_sett():
             q = q + f"`{i}`=%s, "
             params.append(data[i])
     if 'sno' in data:
-        q = q + "where `sno`=%s"
-        params.append(data['sno'])
+        q = q + "where subject like %s and `sno`=%s"
+        params.extend(['%ettlement%', data['sno']])
     elif 'sender' in data:
-        q = q + "where `sender`=%s"
-        params.append(data['sender'])
+        q = q + "where subject like %s and `sender`=%s"
+        params.extend(['%ettlement%', data['sender']])
     q = q.replace(', where', ' where')
 
     with mysql.connector.connect(**conn_data) as con:
