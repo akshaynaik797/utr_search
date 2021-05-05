@@ -63,11 +63,15 @@ def move_in_sett():
     q = "update all_mails set "
     params = []
     for i in data:
-        if i in fields and i != 'sno':
+        if i in fields and i != 'sno' and i != 'sender':
             q = q + f"`{i}`=%s, "
             params.append(data[i])
-    q = q + "where `sno`=%s"
-    params.append(data['sno'])
+    if 'sno' in data:
+        q = q + "where `sno`=%s"
+        params.append(data['sno'])
+    elif 'sender' in data:
+        q = q + "where `sender`=%s"
+        params.append(data['sender'])
     q = q.replace(', where', ' where')
 
     with mysql.connector.connect(**conn_data) as con:
@@ -75,12 +79,18 @@ def move_in_sett():
         cur.execute(q, params)
         con.commit()
 
-        with mysql.connector.connect(**conn_data) as con:
-            cur = con.cursor()
+        if 'sno' in data:
             q = "select * from all_mails where sno=%s limit 1"
             cur.execute(q, (data['sno'],))
-            result1 = cur.fetchone()
-            for k, v in zip(fields, result1):
+            result1 = cur.fetchall()
+        elif 'sender' in data:
+            q = "select * from all_mails where sender=%s"
+            cur.execute(q, (data['sender'],))
+            result1 = cur.fetchall()
+    with mysql.connector.connect(**conn_data) as con:
+        cur = con.cursor()
+        for i in result1:
+            for k, v in zip(fields, i):
                 temp[k] = v
             if data['insurer'] != '_blank':
                 file_path = create_settlement_folder(temp['hospital'], data['insurer'], temp['date'], temp['attach_path'])
@@ -89,8 +99,12 @@ def move_in_sett():
                 temp['id'], temp['subject'], temp['date'], str(datetime.now()), file_path, '', temp['sender'], '',
                 'all_mails_set_api', temp['hospital'])
                 cur.execute(q, data1)
-            q = "update all_mails set completed=%s where sno=%s"
-            cur.execute(q, (flag, data['sno'],))
+            if 'sno' in data:
+                q = "update all_mails set completed=%s where sno=%s"
+                cur.execute(q, (flag, data['sno'],))
+            elif 'sender' in data:
+                q = "update all_mails set completed=%s where `id`=%s and `date`=%s and `subject`=%s"
+                cur.execute(q, (flag, temp['id'], temp['date'], temp['subject']))
             con.commit()
     return jsonify("done")
 
