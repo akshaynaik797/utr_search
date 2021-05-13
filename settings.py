@@ -210,4 +210,11 @@ def html_to_pdf(src, dst):
     data = remove_img_tags(data)
     with open(src, 'w') as fp:
         fp.write(data)
-    pdfkit.from_file(src, dst, configuration=pdfconfig)
+    # pdfkit.from_file(src, dst, configuration=pdfconfig)
+    try:
+        pdfkit.from_file(src, dst, configuration=pdfconfig)
+    except:
+        if os.path.exists(dst):
+            pass
+        else:
+            raise Exception
