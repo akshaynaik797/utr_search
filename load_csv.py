@@ -3,8 +3,9 @@ import re
 import mysql.connector
 
 from settings import conn_data
+#tables to delete settlement_utrs, utr_mails
 
-with open('tmp.csv') as csv_file:
+with open('/home/akshay/Downloads/OldNoData21052021.txt') as csv_file:
     csv_reader = csv.reader(csv_file, delimiter=',')
     line_count = 0
     with mysql.connector.connect(**conn_data) as con:
