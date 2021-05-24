@@ -11,7 +11,7 @@ from pytz import timezone
 time_out = 60
 mail_time = 40 #minutes
 interval = 60 #seconds
-conn_data = {'host': "iclaimdev.caq5osti8c47.ap-south-1.rds.amazonaws.com",
+conn_data = {'host': "database-iclaim.caq5osti8c47.ap-south-1.rds.amazonaws.com",
              'user': "admin",
              'password': "Welcome1!",
              'database': 'python'}
